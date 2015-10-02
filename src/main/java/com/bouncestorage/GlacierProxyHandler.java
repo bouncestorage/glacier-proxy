@@ -45,6 +45,8 @@ public class GlacierProxyHandler implements HttpHandler {
 
         matcher = ARCHIVES_RE.matcher(requestPath);
         if (matcher.matches()) {
+            setParameters(matcher, ImmutableList.of("account", "vault", "archive"), parameters);
+            server.getArchive(parameters).handleRequest(httpExchange, parameters);
             return;
         }
 
