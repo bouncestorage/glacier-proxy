@@ -2,6 +2,7 @@ package com.bouncestorage;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Map;
 
 import org.jclouds.ContextBuilder;
 import org.jclouds.blobstore.BlobStore;
@@ -27,8 +28,12 @@ public class GlacierProxy {
         server.stop(0);
     }
 
-    public Vault getVault(String vault) {
+    public Vault getVault(Map<String, String> parameters) {
         return new Vault(this);
+    }
+
+    public Archive getArchive(Map<String, String> parameters) {
+        return new Archive(this);
     }
 
     public BlobStore getBlobStore() {

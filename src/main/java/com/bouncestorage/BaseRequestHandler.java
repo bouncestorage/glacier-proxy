@@ -14,7 +14,7 @@ abstract class BaseRequestHandler {
         this.proxy = proxy;
     }
 
-    public void handleRequest(HttpExchange httpExchange, Map<String, String> parameters) {
+    public final void handleRequest(HttpExchange httpExchange, Map<String, String> parameters) {
         String method = httpExchange.getRequestMethod();
         try {
             switch (httpExchange.getRequestMethod()) {

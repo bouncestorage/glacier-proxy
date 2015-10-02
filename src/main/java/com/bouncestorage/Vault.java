@@ -18,31 +18,7 @@ public class Vault extends BaseRequestHandler {
         super(proxy);
     }
 
-    public void handleRequest(HttpExchange httpExchange, Map<String, String> parameters) {
-        String method = httpExchange.getRequestMethod();
-        try {
-            switch (httpExchange.getRequestMethod()) {
-                case "GET":
-                    handleGet(httpExchange, parameters);
-                    break;
-                case "PUT":
-                    handlePut(httpExchange, parameters);
-                    break;
-                case "DELETE":
-                    handleDelete(httpExchange, parameters);
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unsupported method " + method);
-            }
-        } catch (IOException e) {
-            try {
-                httpExchange.sendResponseHeaders(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), -1);
-            } catch (IOException sendError) {
-                sendError.printStackTrace();
-            }
-        }
-    }
-
+    @Override
     protected void handleGet(HttpExchange httpExchange, Map<String, String> parameters) throws IOException {
         if (parameters.containsKey("vault") && parameters.get("vault") != null) {
             handleDescribe(httpExchange, parameters);
@@ -68,6 +44,7 @@ public class Vault extends BaseRequestHandler {
         Util.sendJSON(httpExchange, Response.Status.OK, response);
     }
 
+    @Override
     protected void handlePut(HttpExchange httpExchange, Map<String, String> parameters) throws IOException {
         if (!parameters.containsKey("vault") || parameters.get("vault") == null) {
             Util.sendBadRequest(httpExchange);
@@ -77,10 +54,12 @@ public class Vault extends BaseRequestHandler {
         String account = parameters.get("account");
 
         proxy.getBlobStore().createContainerInLocation(null, vault);
-        httpExchange.getResponseHeaders().put("Location", ImmutableList.of("/" + account + "/vaults/" + vault));
+        httpExchange.getResponseHeaders().put("Location", ImmutableList.of(String.format("/%s/vaults/%s", account,
+                vault)));
         httpExchange.sendResponseHeaders(Response.Status.CREATED.getStatusCode(), -1);
     }
 
+    @Override
     protected void handleDelete(HttpExchange httpExchange, Map<String, String> parameters) throws IOException{
         if (!parameters.containsKey("vault") || parameters.get("vault") == null) {
             Util.sendBadRequest(httpExchange);
