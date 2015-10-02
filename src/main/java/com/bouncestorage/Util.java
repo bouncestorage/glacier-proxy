@@ -10,7 +10,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import org.jclouds.blobstore.options.ListContainerOptions;
-import org.json.simple.JSONObject;
+import org.json.JSONObject;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -55,7 +55,7 @@ public class Util {
     }
 
     public static void sendJSON(HttpExchange httpExchange, Response.Status code, JSONObject json) throws IOException {
-        String jsonResponse = json.toJSONString();
+        String jsonResponse = json.toString();
         httpExchange.getResponseHeaders().put("Content-type", ImmutableList.of(MediaType.APPLICATION_JSON));
         httpExchange.sendResponseHeaders(code.getStatusCode(), jsonResponse.length());
         try (OutputStream os = httpExchange.getResponseBody()) {

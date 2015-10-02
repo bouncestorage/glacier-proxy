@@ -7,8 +7,8 @@ import javax.ws.rs.core.Response;
 
 import org.jclouds.blobstore.domain.PageSet;
 import org.jclouds.blobstore.domain.StorageMetadata;
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import com.google.common.collect.ImmutableList;
 import com.sun.net.httpserver.HttpExchange;
@@ -38,7 +38,7 @@ public class Vault extends BaseRequestHandler {
             entry.put("NumberOfArchives", -1);
             entry.put("VaultName", value.getName());
             entry.put("VaultARN", value.getName());
-            values.add(entry);
+            values.put(entry);
         }
         response.put("VaultList", values);
         Util.sendJSON(httpExchange, Response.Status.OK, response);
