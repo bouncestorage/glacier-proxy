@@ -30,7 +30,7 @@ public class Archive extends BaseRequestHandler {
             }
         }
 
-        int length = Integer.parseInt(request.getRequestHeaders().get("Content-Length").get(0));
+        long length = Long.parseLong(request.getRequestHeaders().get("Content-Length").get(0));
         String treeHash = request.getRequestHeaders().get("x-amz-sha256-tree-hash").get(0);
         UUID uuid = UUID.randomUUID();
         Blob newBlob = proxy.getBlobStore().blobBuilder(uuid.toString())

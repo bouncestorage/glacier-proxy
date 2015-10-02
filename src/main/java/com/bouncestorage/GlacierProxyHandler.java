@@ -21,8 +21,9 @@ public class GlacierProxyHandler implements HttpHandler {
     // Caller may specify "-" and expect account to be looked up from the credentials
     static final String VAULT_NAME = "(?<vault>[a-zA-Z0-9\\.-_]+)";
     static final String VAULT_PREFIX = "^/(?<account>(\\d{12}|-))/vaults";
-    static final Pattern JOBS_RE = Pattern.compile(VAULT_PREFIX + "/(?<vault>[a-zA-Z0-9\\.-_]+)/jobs");
-    static final Pattern ARCHIVES_RE = Pattern.compile(String.format("%s/%s/archives(/?(<archive>[a-zA-Z0-9-_]+))?",
+    static final Pattern JOBS_RE = Pattern.compile(String.format("%s/%s/jobs(/(?<job>[a-zA-Z0-9-_]+))?(/output)?",
+            VAULT_PREFIX, VAULT_NAME));
+    static final Pattern ARCHIVES_RE = Pattern.compile(String.format("%s/%s/archives(/(?<archive>[a-zA-Z0-9-_]+))?",
             VAULT_PREFIX, VAULT_NAME));
     static final Pattern VAULTS_RE = Pattern.compile(String.format("%s(/%s)?", VAULT_PREFIX, VAULT_NAME));
 
@@ -38,8 +39,11 @@ public class GlacierProxyHandler implements HttpHandler {
         Map<String, String> parameters = new HashMap<>();
         httpExchange.getResponseHeaders().put("x-amzn-RequestId", ImmutableList.of("glacier-proxy"));
         String requestPath = httpExchange.getRequestURI().getPath();
+
         Matcher matcher = JOBS_RE.matcher(requestPath);
         if (matcher.matches()) {
+            setParameters(matcher, ImmutableList.of("account", "vault", "job"), parameters);
+            server.getJob(parameters).handleRequest(httpExchange, parameters);
             return;
         }
 
