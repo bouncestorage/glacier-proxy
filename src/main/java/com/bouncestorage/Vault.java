@@ -28,7 +28,11 @@ public class Vault extends BaseRequestHandler {
         // TODO: Support pagination (markers) for vault listing
         PageSet<? extends StorageMetadata> results = proxy.getBlobStore().list();
         JSONObject response = new JSONObject();
-        response.put("Marker", results.getNextMarker());
+        if (results.getNextMarker() == null) {
+            response.put("Marker", JSONObject.NULL);
+        } else {
+            response.put("Marker", results.getNextMarker());
+        }
         JSONArray values = new JSONArray();
         for (StorageMetadata value : results) {
             JSONObject entry = new JSONObject();

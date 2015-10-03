@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import org.jclouds.blobstore.domain.Blob;
@@ -114,13 +113,7 @@ public class Job extends BaseRequestHandler {
         }
         response.put("ArchiveList", archives);
 
-        String body = response.toString();
-        httpExchange.getResponseHeaders().put("Content-Length", ImmutableList.of(Integer.toString(body.length())));
-        httpExchange.getResponseHeaders().put("Content-Type", ImmutableList.of(MediaType.APPLICATION_JSON));
-        httpExchange.sendResponseHeaders(Response.Status.OK.getStatusCode(), body.length());
-        try (OutputStream to = httpExchange.getResponseBody()) {
-            to.write(body.getBytes());
-        }
+        Util.sendJSON(httpExchange, Response.Status.OK, response);
     }
 
     private void handleRetrieveArchiveJob(HttpExchange httpExchange, String vault, JSONObject job) throws IOException{

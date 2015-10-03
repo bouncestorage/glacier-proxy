@@ -19,7 +19,7 @@ public class GlacierProxyHandler implements HttpHandler {
     }
 
     // Caller may specify "-" and expect account to be looked up from the credentials
-    static final String VAULT_NAME = "(?<vault>[a-zA-Z0-9\\.-_]+)";
+    static final String VAULT_NAME = "(?<vault>[a-zA-Z0-9\\.\\-_]+)";
     static final String VAULT_PREFIX = "^/(?<account>(\\d{12}|-))/vaults";
     static final Pattern JOBS_RE = Pattern.compile(String.format("%s/%s/jobs(/(?<job>[a-zA-Z0-9-_]+))?(/output)?",
             VAULT_PREFIX, VAULT_NAME));
