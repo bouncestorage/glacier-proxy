@@ -1,4 +1,4 @@
-package com.bouncestorage;
+package com.bouncestorage.glacierproxy;
 
 public class Main {
     public static void main(String[] args) throws Exception {

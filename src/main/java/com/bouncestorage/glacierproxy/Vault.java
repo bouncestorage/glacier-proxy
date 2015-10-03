@@ -1,4 +1,4 @@
-package com.bouncestorage;
+package com.bouncestorage.glacierproxy;
 
 import java.io.IOException;
 import java.util.Map;

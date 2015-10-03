@@ -1,4 +1,4 @@
-package com.bouncestorage;
+package com.bouncestorage.glacierproxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
