@@ -43,7 +43,7 @@ public class GlacierProxyHandler implements HttpHandler {
         Matcher matcher = JOBS_RE.matcher(requestPath);
         if (matcher.matches()) {
             setParameters(matcher, ImmutableList.of("account", "vault", "job"), parameters);
-            server.getJob(parameters).handleRequest(httpExchange, parameters);
+            server.getJobHandler(parameters).handleRequest(httpExchange, parameters);
             return;
         }
 

@@ -41,7 +41,7 @@ public class GlacierProxy {
         return new Archive(this);
     }
 
-    public Job getJob(Map<String, String> parameters) {
+    public Job getJobHandler(Map<String, String> parameters) {
         return new Job(this);
     }
 
