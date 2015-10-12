@@ -55,6 +55,10 @@ public class GlacierProxy {
         return jobMap.get(vault).get(jobId);
     }
 
+    public Map<UUID, JSONObject> getVaultJobs(String vault) {
+        return jobMap.get(vault);
+    }
+
     public void addJob(String vault, UUID jobId, JSONObject json) {
         if (!jobMap.containsKey(vault)) {
             jobMap.put(vault, new ConcurrentHashMap<>());

@@ -11,12 +11,13 @@ import java.util.UUID;
 import javax.ws.rs.core.Response;
 
 import org.jclouds.blobstore.domain.Blob;
-import org.jclouds.blobstore.domain.StorageMetadata;
+import org.jclouds.blobstore.domain.BlobMetadata;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Multimap;
 import com.google.common.io.ByteStreams;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -68,17 +69,20 @@ public class Job extends BaseRequestHandler {
     public void handleGet(HttpExchange request, Map<String, String> parameters) throws IOException {
         // Differentiate between List jobs, describe job, and get job output
         String path = request.getRequestURI().getPath();
-        if (path.endsWith("output")) {
+        if (parameters.get("job") != null) {
             String vault = parameters.get("vault");
-            JSONObject jobRequest = proxy.getJob(parameters.get("vault"), UUID.fromString(parameters.get("job")));
-            if (jobRequest.get("Type").equals("archive-retrieval")) {
-                handleRetrieveArchiveJob(request, vault, jobRequest);
-                return;
-            } else {
-                handleRetrieveInventoryJob(request, vault, jobRequest);
+            JSONObject jobRequest = proxy.getJob(vault, UUID.fromString(parameters.get("job")));
+            if (path.endsWith("output")) {
+                if (jobRequest.get("Type").equals("archive-retrieval")) {
+                    handleRetrieveArchiveJob(request, vault, jobRequest);
+                    return;
+                } else {
+                    handleRetrieveInventoryJob(request, parameters, jobRequest);
+                    return;
+                }
+            } else if (parameters.get("job") != null && path.endsWith(parameters.get("job"))) {
+                handleDescribeJob(request, parameters, jobRequest);
             }
-        } else if (parameters.get("job") != null && path.endsWith(parameters.get("job"))) {
-            handleDescribeJob(request, parameters);
         } else if (path.endsWith("jobs")) {
             handleListJobs(request, parameters);
         } else {
@@ -86,23 +90,131 @@ public class Job extends BaseRequestHandler {
         }
     }
 
-    private void handleDescribeJob(HttpExchange httpExchange, Map<String, String> parameters) throws IOException {
-        Util.sendBadRequest(httpExchange);
+    private void handleDescribeJob(HttpExchange httpExchange, Map<String, String> parameters, JSONObject jobRequest)
+            throws IOException {
+        JSONObject response = null;
+        if (jobRequest.get("Type").equals("archive-retrieval")) {
+            response = handleDescribeRetrieveArchive(parameters, jobRequest);
+        } else if (jobRequest.get("Type").equals("inventory-retrieval")) {
+            response = handleDescribeRetrieveInventory(parameters, jobRequest);
+        }
+        String vault = parameters.get("vault");
+        response.put("Action", jobRequest.get("Type"));
+        response.put("Completed", true);
+        response.put("CompletionDate", Util.getTimeStamp());
+        response.put("CreationDate", Util.getTimeStamp());
+        response.put("JobDescription", jobRequest.opt("JobDescription"));
+        response.put("JobId", parameters.get("job"));
+        response.put("SNSTopic", JSONObject.NULL);
+        response.put("StatusCode", "Succeeded");
+        response.put("StatusMessage", "Succeeded");
+        response.put("VaultARN", Util.getARN(parameters.get("account"), vault));
+        Util.sendJSON(httpExchange, Response.Status.OK, response);
+    }
+
+    private JSONObject handleDescribeRetrieveArchive(Map<String, String> parameters, JSONObject jobRequest) {
+        JSONObject response = new JSONObject();
+        String blobName = (String) jobRequest.get("ArchiveId");
+        BlobMetadata metadata = proxy.getBlobStore().blobMetadata(parameters.get("vault"), blobName);
+        response.put("ArchiveId", jobRequest.get("ArchiveId"));
+        response.put("ArchiveSize", metadata.getSize());
+        response.put("ArchiveSHA256TreeHash", "deadbeef");
+        response.put("InventorySizeInBytes", JSONObject.NULL);
+        response.put("RetrievalByteRange", metadata.getSize()-1);
+        response.put("SHA256TreeHash", JSONObject.NULL);
+        return response;
+    }
+
+    private JSONObject handleDescribeRetrieveInventory(Map<String, String> parameters, JSONObject jobRequest) {
+        JSONObject response = new JSONObject();
+        response.put("ArchiveId", JSONObject.NULL);
+        response.put("ArchiveSize", JSONObject.NULL);
+        response.put("ArchiveSHA256TreeHash", JSONObject.NULL);
+        response.put("InventorySizeInBytes", -1);
+        response.put("RetrievalByteRange", JSONObject.NULL);
+        response.put("SHA256TreeHash", JSONObject.NULL);
+        JSONObject inventoryParams = jobRequest.optJSONObject("InventoryRetrievalParameters");
+        if (inventoryParams != null) {
+            inventoryParams.put("Format", jobRequest.opt("Format"));
+            response.put("InventoryRetrievalParameters", inventoryParams);
+        }
+        return response;
     }
 
     private void handleListJobs(HttpExchange httpExchange, Map<String, String> parameters) throws IOException {
-        Util.sendBadRequest(httpExchange);
+        Multimap<String, String> queryMap = Util.parseQuery(httpExchange.getRequestURI().getQuery());
+        ListJobsOptions listJobsOptions;
+        try {
+            listJobsOptions = new ListJobsOptions(queryMap);
+        } catch (IllegalArgumentException e) {
+            Util.sendBadRequest(httpExchange);
+            return;
+        }
+        String vault = parameters.get("vault");
+        JSONObject response = new JSONObject();
+        // TODO: handle markers and > 1000 jobs
+        response.put("Marker", JSONObject.NULL);
+        JSONArray jsonJobs = new JSONArray();
+        if (listJobsOptions.getCompleted() != null && !listJobsOptions.getCompleted()) {
+            // All jobs are treated as immediately completed
+            response.put("JobList", jsonJobs);
+            Util.sendJSON(httpExchange, Response.Status.OK, response);
+            return;
+        }
+
+        if (listJobsOptions.getStatusCode() != null && !listJobsOptions.getStatusCode().equals("Succeeded")) {
+            // All jobs are treated as immediately completed
+            response.put("JobList", jsonJobs);
+            Util.sendJSON(httpExchange, Response.Status.OK, response);
+            return;
+        }
+
+        Map<UUID, JSONObject> jobs = proxy.getVaultJobs(vault);
+        jobs.forEach((uuid, json) -> {
+            JSONObject jobObject = new JSONObject();
+            jobObject.put("Completed", true);
+            jobObject.put("CompletionDate", Util.getTimeStamp());
+            jobObject.put("StatusCode", "Succeeded");
+            jobObject.put("StatusMessage", "Succeeded");
+            jobObject.put("VaultARN", Util.getARN(parameters.get("account"), vault));
+            jobObject.put("JobId", uuid.toString());
+            jobObject.put("JobDescription", json.get("JobDescription"));
+            jobObject.put("SNSTopic", json.get("SNSTopic"));
+            jobObject.put("SHA256TreeHash", JSONObject.NULL);
+            if (json.get("Type").equals("archive-retrieval")) {
+                jobObject.put("Action", "ArchiveRetrieval");
+                jobObject.put("ArchiveId", json.get("ArchiveId"));
+                // TODO: populate the size
+                jobObject.put("ArchiveSizeInBytes", -1);
+                jobObject.put("ArchiveSHA256TreeHash", "deadbeef");
+                jobObject.put("RetrievalByteRange", -1);
+            } else {
+                jobObject.put("Action", "InventoryRetriveal");
+                jobObject.put("ArchiveSHA256TreeHash", JSONObject.NULL);
+                jobObject.put("InventorySizeInBytes", -1);
+                JSONObject inventoryParams = json.optJSONObject("InventoryRetrievalParameters");
+                if (inventoryParams != null) {
+                    inventoryParams.put("Format", "JSON");
+                    jobObject.put("InventoryRetrievalParameters", inventoryParams);
+                }
+                jobObject.put("RetrievalByteRange", JSONObject.NULL);
+            }
+        });
+        response.put("JobList", jsonJobs);
+        Util.sendJSON(httpExchange, Response.Status.OK, response);
     }
 
-    private void handleRetrieveInventoryJob(HttpExchange httpExchange, String vault, JSONObject job) throws
+    private void handleRetrieveInventoryJob(HttpExchange httpExchange, Map<String, String> parameters, JSONObject job)
+            throws
             IOException {
+        String vault = parameters.get("vault");
         JSONObject response = new JSONObject();
-        response.put("VaultARN", String.format("arn:::::vaults/%s", vault));
+        response.put("VaultARN", Util.getARN(parameters.get("account"), vault));
         response.put("InventoryDate", new Date());
         JSONArray archives = new JSONArray();
 
         // TODO: support pagination
-        for (StorageMetadata sm : proxy.getBlobStore().list(vault)) {
+        proxy.getBlobStore().list(vault).forEach(sm -> {
             JSONObject archive = new JSONObject();
             archive.put("ArchiveId", sm.getName());
             archive.put("CreationDate", sm.getCreationDate());
@@ -110,7 +222,7 @@ public class Job extends BaseRequestHandler {
             archive.put("SHA256TreeHash", "deadbeef");
             archive.put("ArchiveDescription", "NA");
             archives.put(archive);
-        }
+        });
         response.put("ArchiveList", archives);
 
         Util.sendJSON(httpExchange, Response.Status.OK, response);
@@ -129,6 +241,65 @@ public class Job extends BaseRequestHandler {
         httpExchange.sendResponseHeaders(Response.Status.OK.getStatusCode(), size);
         try (InputStream from = blob.getPayload().openStream(); OutputStream to = httpExchange.getResponseBody()){
             ByteStreams.copy(from, to);
+        }
+    }
+
+    private static class ListJobsOptions {
+        private static final List COMPLETED_OPTIONS = ImmutableList.of("true", "false");
+        private static final int MAX_LIMIT = 1000;
+        private static final List STATUS_CODES = ImmutableList.of("Succeeded", "InProgress", "Failed");
+
+        private Boolean completed;
+        private Integer limit;
+        private String marker;
+        private String statusCode;
+
+        public ListJobsOptions(Multimap<String, String> queryParams) {
+            if (queryParams.containsKey("completed")) {
+                String completedString = queryParams.get("completed").iterator().next();
+                if (!COMPLETED_OPTIONS.contains(completedString)) {
+                    throw new IllegalArgumentException("Invalid completed value");
+                }
+                if (completedString.equals("true")) {
+                    completed = true;
+                } else {
+                    completed = false;
+                }
+            }
+
+            if (queryParams.containsKey("limit")) {
+                limit = Integer.parseInt(queryParams.get("limit").iterator().next());
+                if (limit > MAX_LIMIT || limit < 1) {
+                    throw new IllegalArgumentException("Invalid limit value");
+                }
+            }
+
+            if (queryParams.containsKey("statuscode")) {
+                statusCode = queryParams.get("statuscode").iterator().next();
+                if (!STATUS_CODES.contains(statusCode)) {
+                    throw new IllegalArgumentException("Invalid statuscode value");
+                }
+            }
+
+            if (queryParams.containsKey("marker")) {
+                marker = queryParams.get("marker").iterator().next();
+            }
+        }
+
+        Boolean getCompleted() {
+            return completed;
+        }
+
+        Integer getLimit() {
+            return limit;
+        }
+
+        String getMarker() {
+            return marker;
+        }
+
+        String getStatusCode() {
+            return statusCode;
         }
     }
 }

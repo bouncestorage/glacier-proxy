@@ -88,7 +88,7 @@ public class Vault extends BaseRequestHandler {
         vault.put("CreationDate", Util.getTimeStamp());
         vault.put("LastInventoryDate", Util.getTimeStamp());
         vault.put("SizeInBytes", -1);
-        vault.put("VaultARN", parameters.get("vault"));
+        vault.put("VaultARN", Util.getARN(parameters.get("account"), parameters.get("vault")));
         vault.put("VaultName", parameters.get("vault"));
         Util.sendJSON(httpExchange, Response.Status.OK, vault);
     }
