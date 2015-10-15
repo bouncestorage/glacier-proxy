@@ -25,8 +25,9 @@ Make sure to initialize the submodules (```git submodule init```) and keep them 
 (```git submodule update```). After initializing the submodule, run ```./bootstrap``` in the submodule directory.
 
 ### TODO
-- Add support for other backends, rather than just in-memory
-- Add support for additional configuration options (such as port, provider, credentials)
-- Authenticate requests
-- Validate tree- and SHA256 hashes in requests
-- Setup logging for individual requests
+- add support for other backends, rather than just in-memory
+- add support for additional configuration options (such as port, provider, credentials)
+- authenticate requests
+- validate tree- and SHA256 hashes in requests
+- setup logging for individual requests
+- implement multi-part archive upload
