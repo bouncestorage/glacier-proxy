@@ -19,7 +19,7 @@ public class GlacierProxy {
     private Map<String, Map<UUID, JSONObject>> jobMap;
 
     public void start() throws IOException {
-        server = HttpServer.create(new InetSocketAddress(8000), 0);
+        server = HttpServer.create(new InetSocketAddress(8081), 0);
         server.createContext("/", new GlacierProxyHandler(this));
         server.setExecutor(null);
         server.start();

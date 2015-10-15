@@ -245,9 +245,9 @@ public class Job extends BaseRequestHandler {
     }
 
     private static class ListJobsOptions {
-        private static final List COMPLETED_OPTIONS = ImmutableList.of("true", "false");
+        private static final List<String> COMPLETED_OPTIONS = ImmutableList.of("true", "false");
         private static final int MAX_LIMIT = 1000;
-        private static final List STATUS_CODES = ImmutableList.of("Succeeded", "InProgress", "Failed");
+        private static final List<String> STATUS_CODES = ImmutableList.of("Succeeded", "InProgress", "Failed");
 
         private Boolean completed;
         private Integer limit;

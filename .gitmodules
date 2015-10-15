@@ -1,0 +1,3 @@
+[submodule "glacier-tests"]
+	path = glacier-tests
+	url = git://github.com/bouncestorage/glacier-tests.git
