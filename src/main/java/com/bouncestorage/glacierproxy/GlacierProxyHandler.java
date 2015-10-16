@@ -7,11 +7,16 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.collect.ImmutableList;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
 public class GlacierProxyHandler implements HttpHandler {
+    private static final Logger logger = LoggerFactory.getLogger(GlacierProxy.class);
+
     private GlacierProxy server;
 
     GlacierProxyHandler(GlacierProxy server) {
@@ -32,6 +37,8 @@ public class GlacierProxyHandler implements HttpHandler {
 
     public void handle(HttpExchange httpExchange) throws IOException {
         if (!httpExchange.getRequestHeaders().get(VERSION_HEADER).get(0).equals(CURRENT_VERSION)) {
+            logger.warn("Invalid or missing API version: {}; expected {}",
+                    httpExchange.getRequestHeaders().get(VERSION_HEADER).get(0), CURRENT_VERSION);
             Util.sendBadRequest(httpExchange);
             return;
         }
@@ -39,6 +46,8 @@ public class GlacierProxyHandler implements HttpHandler {
         Map<String, String> parameters = new HashMap<>();
         httpExchange.getResponseHeaders().put("x-amzn-RequestId", ImmutableList.of("glacier-proxy"));
         String requestPath = httpExchange.getRequestURI().getPath();
+
+        logger.debug("Processing {}", requestPath);
 
         Matcher matcher = JOBS_RE.matcher(requestPath);
         if (matcher.matches()) {
@@ -60,6 +69,9 @@ public class GlacierProxyHandler implements HttpHandler {
             server.getVault(parameters).handleRequest(httpExchange, parameters);
             return;
         }
+
+        logger.debug("Unknown request {}", requestPath);
+        Util.sendBadRequest(httpExchange);
     }
 
     private void setParameters(Matcher matcher, List<String> keys, Map<String, String> parameters) {
