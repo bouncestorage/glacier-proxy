@@ -10,10 +10,14 @@ import org.jclouds.ContextBuilder;
 import org.jclouds.blobstore.BlobStore;
 import org.jclouds.blobstore.BlobStoreContext;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.sun.net.httpserver.HttpServer;
 
 public class GlacierProxy {
+    private static final Logger logger = LoggerFactory.getLogger(GlacierProxy.class);
+
     private HttpServer server;
     private BlobStore blobStore;
     private Map<String, Map<UUID, JSONObject>> jobMap;
@@ -27,6 +31,7 @@ public class GlacierProxy {
                 .build(BlobStoreContext.class);
         blobStore = context.getBlobStore();
         jobMap = new ConcurrentHashMap<>();
+        logger.info("Proxy started");
     }
 
     public void stop() {

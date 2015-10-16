@@ -67,6 +67,10 @@ public class Util {
         httpExchange.sendResponseHeaders(Response.Status.BAD_REQUEST.getStatusCode(), -1);
     }
 
+    public static void sendNotFound(HttpExchange httpExchange) throws IOException {
+        httpExchange.sendResponseHeaders(Response.Status.NOT_FOUND.getStatusCode(), -1);
+    }
+
     public static String getARN(String accountId, String vault) {
         return String.format("arn:aws:glacier::%s:vaults/%s", accountId, vault);
     }

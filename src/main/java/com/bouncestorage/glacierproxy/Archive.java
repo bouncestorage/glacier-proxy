@@ -8,12 +8,16 @@ import java.util.UUID;
 import javax.ws.rs.core.Response;
 
 import org.jclouds.blobstore.domain.Blob;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableList;
 import com.sun.net.httpserver.HttpExchange;
 
 public class Archive extends BaseRequestHandler {
-    private static List<String> REQUIRED_POST_HEADERS = ImmutableList.of("x-amz-content-sha256",
+    private static final Logger logger = LoggerFactory.getLogger(Archive.class);
+
+    private static final List<String> REQUIRED_POST_HEADERS = ImmutableList.of("x-amz-content-sha256",
             "x-amz-sha256-tree-hash");
 
     public Archive(GlacierProxy proxy) {
@@ -25,11 +29,13 @@ public class Archive extends BaseRequestHandler {
         // TODO: should verify the hashes
         for (String header : REQUIRED_POST_HEADERS) {
             if (!request.getRequestHeaders().containsKey(header)) {
+                logger.warn("Missing x-amz-content-sha256 or x-amz-sha256-tree-hash hashes");
                 Util.sendBadRequest(request);
                 return;
             }
         }
 
+        String vault = parameters.get("vault");
         long length = Long.parseLong(request.getRequestHeaders().get("Content-Length").get(0));
         String treeHash = request.getRequestHeaders().get("x-amz-sha256-tree-hash").get(0);
         UUID uuid = UUID.randomUUID();
@@ -37,15 +43,17 @@ public class Archive extends BaseRequestHandler {
                 .payload(request.getRequestBody())
                 .contentLength(length)
                 .build();
-        String etag = proxy.getBlobStore().putBlob(parameters.get("vault"), newBlob);
+        String etag = proxy.getBlobStore().putBlob(vault, newBlob);
         if (etag == null) {
+            logger.warn("Failed to create blob in {}", vault);
             Util.sendBadRequest(request);
             return;
         }
 
+        logger.debug("Created a blob: {}/{}", vault, uuid.toString());
         request.getResponseHeaders().put("x-amz-sha256-tree-hash", ImmutableList.of(treeHash));
         request.getResponseHeaders().put("Location", ImmutableList.of(String.format("/%s/%s/%s",
-                parameters.get("account"), parameters.get("vault"), uuid)));
+                parameters.get("account"), vault, uuid)));
         request.getResponseHeaders().put("x-amz-archive-id", ImmutableList.of(uuid.toString()));
         request.sendResponseHeaders(Response.Status.CREATED.getStatusCode(), -1);
     }
@@ -54,10 +62,15 @@ public class Archive extends BaseRequestHandler {
     public void handleDelete(HttpExchange request, Map<String, String> parameters) throws IOException {
         if (!parameters.containsKey("archive")) {
             Util.sendBadRequest(request);
+            logger.debug("Delete arcihve called without an archive ID");
             return;
         }
 
-        proxy.getBlobStore().removeBlob(parameters.get("vault"), parameters.get("archive"));
+        String blob = parameters.get("archive");
+        String vault = parameters.get("vault");
+
+        proxy.getBlobStore().removeBlob(vault, blob);
+        logger.debug("Removed archive {}/{}", vault, blob);
         request.sendResponseHeaders(Response.Status.NO_CONTENT.getStatusCode(), -1);
     }
 }

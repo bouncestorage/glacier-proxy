@@ -9,11 +9,15 @@ import org.jclouds.blobstore.domain.PageSet;
 import org.jclouds.blobstore.domain.StorageMetadata;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableList;
 import com.sun.net.httpserver.HttpExchange;
 
 public class Vault extends BaseRequestHandler {
+    private static final Logger logger = LoggerFactory.getLogger(Vault.class);
+
     public Vault(GlacierProxy proxy) {
         super(proxy);
     }
@@ -45,6 +49,7 @@ public class Vault extends BaseRequestHandler {
             values.put(entry);
         }
         response.put("VaultList", values);
+        logger.debug("List vaults: {}", response.toString(4));
         Util.sendJSON(httpExchange, Response.Status.OK, response);
     }
 
@@ -58,6 +63,7 @@ public class Vault extends BaseRequestHandler {
         String account = parameters.get("account");
 
         proxy.getBlobStore().createContainerInLocation(null, vault);
+        logger.debug("Created a new vault {}", vault);
         httpExchange.getResponseHeaders().put("Location", ImmutableList.of(String.format("/%s/vaults/%s", account,
                 vault)));
         httpExchange.sendResponseHeaders(Response.Status.CREATED.getStatusCode(), -1);
@@ -66,6 +72,7 @@ public class Vault extends BaseRequestHandler {
     @Override
     protected void handleDelete(HttpExchange httpExchange, Map<String, String> parameters) throws IOException{
         if (!parameters.containsKey("vault") || parameters.get("vault") == null) {
+            logger.debug("Delete vault: invalid vault name");
             Util.sendBadRequest(httpExchange);
             return;
         }
@@ -73,17 +80,22 @@ public class Vault extends BaseRequestHandler {
         String vault = parameters.get("vault");
         boolean result = proxy.getBlobStore().deleteContainerIfEmpty(vault);
         if (!result) {
+            logger.warn("Failed to delete vault {}", vault);
             Util.sendBadRequest(httpExchange);
             return;
         }
+        logger.debug("Deleted vault {}", vault);
         httpExchange.sendResponseHeaders(Response.Status.NO_CONTENT.getStatusCode(), -1);
     }
 
     private void handleDescribe(HttpExchange httpExchange, Map<String, String> parameters) throws IOException {
-        if (!proxy.getBlobStore().containerExists(parameters.get("vault"))) {
+        String vaultName = parameters.get("vault");
+        if (!proxy.getBlobStore().containerExists(vaultName)) {
+            logger.debug("Describe vault: vault {} does not exist", vaultName);
             httpExchange.sendResponseHeaders(Response.Status.NOT_FOUND.getStatusCode(), -1);
             return;
         }
+        logger.debug("Describe vault request for {}", vaultName);
         JSONObject vault = new JSONObject();
         vault.put("CreationDate", Util.getTimeStamp());
         vault.put("LastInventoryDate", Util.getTimeStamp());
