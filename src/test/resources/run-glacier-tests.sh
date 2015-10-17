@@ -30,7 +30,7 @@ done
 
 # execute glacier-tests
 pushd glacier-tests
-./virtualenv/bin/nosetests
+./virtualenv/bin/nosetests --processes=10
 EXIT_CODE=$?
 popd
 
