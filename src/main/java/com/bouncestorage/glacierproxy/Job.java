@@ -107,6 +107,10 @@ public class Job extends BaseRequestHandler {
             response = handleDescribeRetrieveArchive(parameters, jobRequest);
         } else if (jobRequest.get("Type").equals("inventory-retrieval")) {
             response = handleDescribeRetrieveInventory(parameters, jobRequest);
+        } else {
+            logger.warn("Invalid request {}", httpExchange.getRequestURI().getPath());
+            Util.sendBadRequest(httpExchange);
+            return;
         }
         logger.debug("Describe job {}", parameters.get("job"));
         String vault = parameters.get("vault");
