@@ -2,6 +2,7 @@ package com.bouncestorage.glacierproxy;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.TimeZone;
@@ -59,7 +60,7 @@ public class Util {
         httpExchange.getResponseHeaders().put("Content-type", ImmutableList.of(MediaType.APPLICATION_JSON));
         httpExchange.sendResponseHeaders(code.getStatusCode(), jsonResponse.length());
         try (OutputStream os = httpExchange.getResponseBody()) {
-            os.write(jsonResponse.getBytes());
+            os.write(jsonResponse.getBytes(StandardCharsets.UTF_8));
         }
     }
 
