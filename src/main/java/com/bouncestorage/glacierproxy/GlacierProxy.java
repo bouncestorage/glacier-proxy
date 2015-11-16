@@ -51,24 +51,25 @@ public class GlacierProxy {
     }
 
     public JSONObject getJob(String vault, UUID jobId) {
-        if (!jobMap.containsKey(vault)) {
+        try {
+            return jobMap.get(vault).get(jobId);
+        } catch (NullPointerException npe) {
+            // the "vault" may not be in the map
             return null;
         }
-        if (!jobMap.get(vault).containsKey(jobId)) {
-            return null;
-        }
-        return jobMap.get(vault).get(jobId);
     }
 
     public Map<UUID, JSONObject> getVaultJobs(String vault) {
         return jobMap.get(vault);
     }
 
-    public void addJob(String vault, UUID jobId, JSONObject json) {
+    public UUID addJob(String vault, JSONObject json) {
+        UUID uuid = UUID.randomUUID();
         if (!jobMap.containsKey(vault)) {
             jobMap.put(vault, new ConcurrentHashMap<>());
         }
-        jobMap.get(vault).put(jobId, json);
+        jobMap.get(vault).put(uuid, json);
+        return uuid;
     }
 
     public BlobStore getBlobStore() {

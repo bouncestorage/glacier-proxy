@@ -40,12 +40,12 @@ public class Vault extends BaseRequestHandler {
         JSONArray values = new JSONArray();
         for (StorageMetadata value : results) {
             JSONObject entry = new JSONObject();
-            entry.put("CreationDate", value.getCreationDate());
-            entry.put("LastInvetoryDate", value.getCreationDate());
-            entry.put("SizeInBytes", value.getSize());
-            entry.put("NumberOfArchives", -1);
+            entry.put("CreationDate", Util.getTimeStamp(value.getCreationDate()));
+            entry.put("LastInventoryDate", Util.getTimeStamp(value.getCreationDate()));
+            entry.put("SizeInBytes", -1);
+            entry.put("NumberOfArchives", 0);
             entry.put("VaultName", value.getName());
-            entry.put("VaultARN", value.getName());
+            entry.put("VaultARN", Util.getARN(parameters.get("account"), value.getName()));
             values.put(entry);
         }
         response.put("VaultList", values);
@@ -56,7 +56,7 @@ public class Vault extends BaseRequestHandler {
     @Override
     protected void handlePut(HttpExchange httpExchange, Map<String, String> parameters) throws IOException {
         if (!parameters.containsKey("vault") || parameters.get("vault") == null) {
-            Util.sendBadRequest(httpExchange);
+            Util.sendBadRequest("Missing vault name", httpExchange);
             return;
         }
         String vault = parameters.get("vault");
@@ -73,7 +73,7 @@ public class Vault extends BaseRequestHandler {
     protected void handleDelete(HttpExchange httpExchange, Map<String, String> parameters) throws IOException{
         if (!parameters.containsKey("vault") || parameters.get("vault") == null) {
             logger.debug("Delete vault: invalid vault name");
-            Util.sendBadRequest(httpExchange);
+            Util.sendBadRequest("Missing vault name", httpExchange);
             return;
         }
 
@@ -81,7 +81,7 @@ public class Vault extends BaseRequestHandler {
         boolean result = proxy.getBlobStore().deleteContainerIfEmpty(vault);
         if (!result) {
             logger.warn("Failed to delete vault {}", vault);
-            Util.sendBadRequest(httpExchange);
+            Util.sendBadRequest("Failed to delete vault. Vault possibly not empty", httpExchange);
             return;
         }
         logger.debug("Deleted vault {}", vault);
@@ -92,13 +92,18 @@ public class Vault extends BaseRequestHandler {
         String vaultName = parameters.get("vault");
         if (!proxy.getBlobStore().containerExists(vaultName)) {
             logger.debug("Describe vault: vault {} does not exist", vaultName);
-            httpExchange.sendResponseHeaders(Response.Status.NOT_FOUND.getStatusCode(), -1);
+            Util.sendNotFound("vault", vaultName, httpExchange);
             return;
         }
         logger.debug("Describe vault request for {}", vaultName);
         JSONObject vault = new JSONObject();
-        vault.put("CreationDate", Util.getTimeStamp());
-        vault.put("LastInventoryDate", Util.getTimeStamp());
+        for (StorageMetadata container : proxy.getBlobStore().list()) {
+            if (!container.getName().equals(vaultName)) {
+                continue;
+            }
+            vault.put("CreationDate", Util.getTimeStamp(container.getCreationDate()));
+            vault.put("LastInventoryDate", Util.getTimeStamp(container.getCreationDate()));
+        }
         vault.put("SizeInBytes", -1);
         vault.put("VaultARN", Util.getARN(parameters.get("account"), parameters.get("vault")));
         vault.put("VaultName", parameters.get("vault"));
