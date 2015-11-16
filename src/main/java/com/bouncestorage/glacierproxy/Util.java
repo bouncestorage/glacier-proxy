@@ -95,4 +95,12 @@ public class Util {
     public static String getARN(String accountId, String vault) {
         return String.format("arn:aws:glacier::%s:vaults/%s", accountId, vault);
     }
+
+    public static String getMultipartLocation(String accountId, String vault, String archive) {
+        return String.format("%s/vaults/%s/multipart-uploads/%s", accountId, vault, archive);
+    }
+
+    public static String getArchiveLocation(String accountId, String vault, String archive) {
+        return String.format("%s/vaults/%s/archives/%s", accountId, vault, archive);
+    }
 }

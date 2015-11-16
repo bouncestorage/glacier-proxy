@@ -30,6 +30,8 @@ public class GlacierProxyHandler implements HttpHandler {
             VAULT_PREFIX, VAULT_NAME));
     static final Pattern ARCHIVES_RE = Pattern.compile(String.format("%s/%s/archives(/(?<archive>[a-zA-Z0-9-_]+))?",
             VAULT_PREFIX, VAULT_NAME));
+    static final Pattern MULTIPART_RE = Pattern.compile(
+            String.format("%s/%s/multipart-uploads(/(?<upload>[a-zA-Z0-9-_]+))?", VAULT_PREFIX, VAULT_NAME));
     static final Pattern VAULTS_RE = Pattern.compile(String.format("%s(/%s)?", VAULT_PREFIX, VAULT_NAME));
 
     static final String VERSION_HEADER = "x-amz-glacier-version";
@@ -60,6 +62,13 @@ public class GlacierProxyHandler implements HttpHandler {
         if (matcher.matches()) {
             setParameters(matcher, ImmutableList.of("account", "vault", "archive"), parameters);
             server.getArchive(parameters).handleRequest(httpExchange, parameters);
+            return;
+        }
+
+        matcher = MULTIPART_RE.matcher(requestPath);
+        if (matcher.matches()) {
+            setParameters(matcher, ImmutableList.of("account", "vault", "upload"), parameters);
+            server.getMultipartHandler(parameters).handleRequest(httpExchange, parameters);
             return;
         }
 
