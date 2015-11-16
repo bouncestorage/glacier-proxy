@@ -21,6 +21,7 @@ public class GlacierProxy {
     private HttpServer server;
     private BlobStore blobStore;
     private Map<String, Map<UUID, JSONObject>> jobMap;
+    private Map<String, Map<UUID, Multipart.Upload>> partsMap;
 
     public void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress(8081), 0);
@@ -31,6 +32,7 @@ public class GlacierProxy {
                 .build(BlobStoreContext.class);
         blobStore = context.getBlobStore();
         jobMap = new ConcurrentHashMap<>();
+        partsMap = new ConcurrentHashMap<>();
         logger.info("Proxy started");
     }
 
@@ -48,6 +50,10 @@ public class GlacierProxy {
 
     public Job getJobHandler(Map<String, String> parameters) {
         return new Job(this);
+    }
+
+    public Multipart getMultipartHandler(Map<String, String> parameters) {
+        return new Multipart(this);
     }
 
     public JSONObject getJob(String vault, UUID jobId) {
@@ -70,6 +76,37 @@ public class GlacierProxy {
         }
         jobMap.get(vault).put(uuid, json);
         return uuid;
+    }
+
+    public UUID createMultipartUpload(String vault, Multipart.Upload upload) {
+        if (!partsMap.containsKey(vault)) {
+            partsMap.put(vault, new ConcurrentHashMap<>());
+        }
+        UUID uuid = UUID.randomUUID();
+        partsMap.get(vault).put(uuid, upload);
+        return uuid;
+    }
+
+    public Map<UUID, Multipart.Upload> getUploads(String vault) {
+        return partsMap.get(vault);
+    }
+
+    public Multipart.Upload getUpload(String vault, UUID uploadId) {
+        try {
+            return partsMap.get(vault).get(uploadId);
+        } catch (NullPointerException npe) {
+            // the "vault" may not be in the map
+            return null;
+        }
+    }
+
+    public void completeUpload(String vault, UUID uploadId) {
+        try {
+            partsMap.get(vault).remove(uploadId);
+        } catch (NullPointerException npe) {
+            // the upload may have been already removed
+            return;
+        }
     }
 
     public BlobStore getBlobStore() {
