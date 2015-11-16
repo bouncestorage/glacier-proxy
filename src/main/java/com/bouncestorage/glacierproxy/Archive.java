@@ -30,14 +30,14 @@ public class Archive extends BaseRequestHandler {
         for (String header : REQUIRED_POST_HEADERS) {
             if (!request.getRequestHeaders().containsKey(header)) {
                 logger.warn("Missing x-amz-content-sha256 or x-amz-sha256-tree-hash hashes");
-                Util.sendBadRequest(request);
+                Util.sendBadRequest("Missing content or tree hash", request);
                 return;
             }
         }
 
         String vault = parameters.get("vault");
-        long length = Long.parseLong(request.getRequestHeaders().get("Content-Length").get(0));
-        String treeHash = request.getRequestHeaders().get("x-amz-sha256-tree-hash").get(0);
+        long length = Long.parseLong(request.getRequestHeaders().getFirst("Content-Length"));
+        String treeHash = request.getRequestHeaders().getFirst("x-amz-sha256-tree-hash");
         UUID uuid = UUID.randomUUID();
         Blob newBlob = proxy.getBlobStore().blobBuilder(uuid.toString())
                 .payload(request.getRequestBody())
@@ -46,7 +46,7 @@ public class Archive extends BaseRequestHandler {
         String etag = proxy.getBlobStore().putBlob(vault, newBlob);
         if (etag == null) {
             logger.warn("Failed to create blob in {}", vault);
-            Util.sendBadRequest(request);
+            Util.sendServerError("Failed to create the archive", request);
             return;
         }
 
@@ -61,7 +61,7 @@ public class Archive extends BaseRequestHandler {
     @Override
     public void handleDelete(HttpExchange request, Map<String, String> parameters) throws IOException {
         if (!parameters.containsKey("archive")) {
-            Util.sendBadRequest(request);
+            Util.sendBadRequest("Archive ID must be specified", request);
             logger.debug("Delete arcihve called without an archive ID");
             return;
         }

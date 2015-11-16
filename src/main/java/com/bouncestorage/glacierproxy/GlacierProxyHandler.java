@@ -36,10 +36,10 @@ public class GlacierProxyHandler implements HttpHandler {
     static final String CURRENT_VERSION = "2012-06-01";
 
     public void handle(HttpExchange httpExchange) throws IOException {
-        if (!httpExchange.getRequestHeaders().get(VERSION_HEADER).get(0).equals(CURRENT_VERSION)) {
+        if (!httpExchange.getRequestHeaders().getFirst(VERSION_HEADER).equals(CURRENT_VERSION)) {
             logger.warn("Invalid or missing API version: {}; expected {}",
-                    httpExchange.getRequestHeaders().get(VERSION_HEADER).get(0), CURRENT_VERSION);
-            Util.sendBadRequest(httpExchange);
+                    httpExchange.getRequestHeaders().getFirst(VERSION_HEADER), CURRENT_VERSION);
+            Util.sendBadRequest("Unsupported or missing API version", httpExchange);
             return;
         }
 
@@ -71,7 +71,7 @@ public class GlacierProxyHandler implements HttpHandler {
         }
 
         logger.debug("Unknown request {}", requestPath);
-        Util.sendBadRequest(httpExchange);
+        Util.sendBadRequest("Unknown request", httpExchange);
     }
 
     private void setParameters(Matcher matcher, List<String> keys, Map<String, String> parameters) {

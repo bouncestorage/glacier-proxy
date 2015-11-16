@@ -37,31 +37,30 @@ public class Job extends BaseRequestHandler {
         String jobType = object.optString("Type");
         if (jobType == null || !JOB_TYPES.contains(jobType)) {
             logger.warn("Invalid job type {}", object.getString("Type"));
-            Util.sendBadRequest(request);
+            Util.sendBadRequest(String.format("Invalid job type %s", jobType), request);
             return;
         }
 
         String vault = parameters.get("vault");
         if (!proxy.getBlobStore().containerExists(vault)) {
             logger.warn("POST job: vault {} does not exist", vault);
-            Util.sendBadRequest(request);
+            Util.sendNotFound("vault", vault, request);
         }
 
         if (jobType.equals("archive-retrieval")) {
             String blobName = object.getString("ArchiveId");
             if (blobName == null) {
-                Util.sendBadRequest(request);
+                Util.sendBadRequest("Missing archive ID", request);
                 return;
             }
             if (!proxy.getBlobStore().blobExists(parameters.get("vault"), blobName)) {
                 logger.warn("POST Archive retrieval job: archive does not exist {}/{}", vault, blobName);
-                Util.sendBadRequest(request);
+                Util.sendNotFound("archive", blobName, request);
                 return;
             }
         }
 
-        UUID jobId = UUID.randomUUID();
-        proxy.addJob(parameters.get("vault"), jobId, object);
+        UUID jobId = proxy.addJob(parameters.get("vault"), object);
         request.getResponseHeaders().put("x-amz-job-id", ImmutableList.of(jobId.toString()));
         request.getResponseHeaders().put("Location", ImmutableList.of(String.format("/%s/vaults/%s/jobs/%s",
                 parameters.get("account"), parameters.get("vault"), jobId.toString())));
@@ -75,10 +74,11 @@ public class Job extends BaseRequestHandler {
         String path = request.getRequestURI().getPath();
         if (parameters.get("job") != null) {
             String vault = parameters.get("vault");
-            JSONObject jobRequest = proxy.getJob(vault, UUID.fromString(parameters.get("job")));
+            String jobId = parameters.get("job");
+            JSONObject jobRequest = proxy.getJob(vault, UUID.fromString(jobId));
             if (jobRequest == null) {
-                logger.debug("Job {} does not exist", parameters.get("job"));
-                Util.sendNotFound(request);
+                logger.debug("Job {} does not exist", jobId);
+                Util.sendNotFound("job", jobId, request);
                 return;
             }
             if (path.endsWith("output")) {
@@ -96,7 +96,7 @@ public class Job extends BaseRequestHandler {
             handleListJobs(request, parameters);
         } else {
             logger.warn("Invalid request {}", path);
-            Util.sendBadRequest(request);
+            Util.sendBadRequest("Invalid request path", request);
         }
     }
 
@@ -109,15 +109,15 @@ public class Job extends BaseRequestHandler {
             response = handleDescribeRetrieveInventory(parameters, jobRequest);
         } else {
             logger.warn("Invalid request {}", httpExchange.getRequestURI().getPath());
-            Util.sendBadRequest(httpExchange);
+            Util.sendBadRequest("Invalid service path", httpExchange);
             return;
         }
         logger.debug("Describe job {}", parameters.get("job"));
         String vault = parameters.get("vault");
         response.put("Action", jobRequest.get("Type"));
         response.put("Completed", true);
-        response.put("CompletionDate", Util.getTimeStamp());
-        response.put("CreationDate", Util.getTimeStamp());
+        response.put("CompletionDate", Util.getTimeStamp(null));
+        response.put("CreationDate", Util.getTimeStamp(null));
         response.put("JobDescription", jobRequest.opt("JobDescription"));
         response.put("JobId", parameters.get("job"));
         response.put("SNSTopic", JSONObject.NULL);
@@ -163,7 +163,7 @@ public class Job extends BaseRequestHandler {
             listJobsOptions = new ListJobsOptions(queryMap);
         } catch (IllegalArgumentException e) {
             logger.warn("Invalid list jobs argument {}", e.getMessage());
-            Util.sendBadRequest(httpExchange);
+            Util.sendBadRequest(String.format("Invalid list jobs parameter: %s", e.getMessage()), httpExchange);
             return;
         }
         String vault = parameters.get("vault");
@@ -191,7 +191,7 @@ public class Job extends BaseRequestHandler {
         jobs.forEach((uuid, json) -> {
             JSONObject jobObject = new JSONObject();
             jobObject.put("Completed", true);
-            jobObject.put("CompletionDate", Util.getTimeStamp());
+            jobObject.put("CompletionDate", Util.getTimeStamp(null));
             jobObject.put("StatusCode", "Succeeded");
             jobObject.put("StatusMessage", "Succeeded");
             jobObject.put("VaultARN", Util.getARN(parameters.get("account"), vault));
@@ -251,7 +251,7 @@ public class Job extends BaseRequestHandler {
         String blobName = job.getString("ArchiveId");
         Blob blob = proxy.getBlobStore().getBlob(vault, blobName);
         if (blob == null) {
-            Util.sendBadRequest(httpExchange);
+            Util.sendNotFound("archive", blobName, httpExchange);
             return;
         }
         logger.debug("Job {}: Retrieve archive {}/{}", job.get("JobId"), vault, blobName);

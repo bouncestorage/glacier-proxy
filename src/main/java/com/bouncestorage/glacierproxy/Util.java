@@ -20,7 +20,7 @@ import com.google.common.collect.Multimap;
 import com.sun.net.httpserver.HttpExchange;
 
 public class Util {
-    public static final String DATE_FORMAT = "EEE, dd MMM yyyy HH:mm:ss zzz";
+    public static final String DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ssZ";
 
     public static Multimap<String, String> parseQuery(String query) {
         Multimap<String, String> map = LinkedHashMultimap.create();
@@ -49,10 +49,13 @@ public class Util {
         return options;
     }
 
-    public static String getTimeStamp() {
+    public static String getTimeStamp(Date date) {
         SimpleDateFormat format = new SimpleDateFormat(DATE_FORMAT);
         format.setTimeZone(TimeZone.getTimeZone("GMT"));
-        return format.format(new Date());
+        if (date == null) {
+            return format.format(new Date());
+        }
+        return format.format(date);
     }
 
     public static void sendJSON(HttpExchange httpExchange, Response.Status code, JSONObject json) throws IOException {
@@ -64,12 +67,29 @@ public class Util {
         }
     }
 
-    public static void sendBadRequest(HttpExchange httpExchange) throws IOException {
-        httpExchange.sendResponseHeaders(Response.Status.BAD_REQUEST.getStatusCode(), -1);
+    public static void sendBadRequest(String message, HttpExchange httpExchange) throws IOException {
+        JSONObject response = new JSONObject();
+        response.put("code", "BadRequest");
+        response.put("message", message);
+        response.put("type", "client");
+        sendJSON(httpExchange, Response.Status.BAD_REQUEST, response);
     }
 
-    public static void sendNotFound(HttpExchange httpExchange) throws IOException {
-        httpExchange.sendResponseHeaders(Response.Status.NOT_FOUND.getStatusCode(), -1);
+    public static void sendServerError(String message, HttpExchange httpExchange) throws IOException {
+        JSONObject response = new JSONObject();
+        response.put("code", "ServiceUnavailableException");
+        response.put("message", message);
+        response.put("type", "server");
+        sendJSON(httpExchange, Response.Status.SERVICE_UNAVAILABLE, response);
+    }
+
+    public static void sendNotFound(String resourceType, String resourceId, HttpExchange httpExchange) throws
+            IOException {
+        JSONObject response = new JSONObject();
+        response.put("code", "ResourceNotFoundException");
+        response.put("message", String.format("The %s was not found: %s", resourceType, resourceId));
+        response.put("type", "client");
+        sendJSON(httpExchange, Response.Status.NOT_FOUND, response);
     }
 
     public static String getARN(String accountId, String vault) {
