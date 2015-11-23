@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import javax.ws.rs.core.Response;
 
+import org.jclouds.blobstore.ContainerNotFoundException;
 import org.jclouds.blobstore.domain.Blob;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,12 +39,19 @@ public class Archive extends BaseRequestHandler {
         String vault = parameters.get("vault");
         long length = Long.parseLong(request.getRequestHeaders().getFirst("Content-Length"));
         String treeHash = request.getRequestHeaders().getFirst("x-amz-sha256-tree-hash");
+
         UUID uuid = UUID.randomUUID();
+        String etag;
         Blob newBlob = proxy.getBlobStore().blobBuilder(uuid.toString())
                 .payload(request.getRequestBody())
                 .contentLength(length)
                 .build();
-        String etag = proxy.getBlobStore().putBlob(vault, newBlob);
+        try {
+            etag = proxy.getBlobStore().putBlob(vault, newBlob);
+        } catch (ContainerNotFoundException cnfe) {
+            Util.sendNotFound("vault", vault, request);
+            return;
+        }
         if (etag == null) {
             logger.warn("Failed to create blob in {}", vault);
             Util.sendServerError("Failed to create the archive", request);
