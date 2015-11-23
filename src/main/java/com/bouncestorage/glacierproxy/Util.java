@@ -1,7 +1,6 @@
 package com.bouncestorage.glacierproxy;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -62,9 +61,7 @@ public class Util {
         String jsonResponse = json.toString();
         httpExchange.getResponseHeaders().put("Content-type", ImmutableList.of(MediaType.APPLICATION_JSON));
         httpExchange.sendResponseHeaders(code.getStatusCode(), jsonResponse.length());
-        try (OutputStream os = httpExchange.getResponseBody()) {
-            os.write(jsonResponse.getBytes(StandardCharsets.UTF_8));
-        }
+        httpExchange.getResponseBody().write(jsonResponse.getBytes(StandardCharsets.UTF_8));
     }
 
     public static void sendBadRequest(String message, HttpExchange httpExchange) throws IOException {

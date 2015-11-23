@@ -81,6 +81,7 @@ public class GlacierProxyHandler implements HttpHandler {
 
         logger.debug("Unknown request {}", requestPath);
         Util.sendBadRequest("Unknown request", httpExchange);
+        httpExchange.getResponseBody().close();
     }
 
     private void setParameters(Matcher matcher, List<String> keys, Map<String, String> parameters) {

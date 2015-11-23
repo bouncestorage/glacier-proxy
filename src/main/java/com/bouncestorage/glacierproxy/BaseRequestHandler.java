@@ -33,9 +33,11 @@ abstract class BaseRequestHandler {
                 default:
                     throw new IllegalArgumentException("Unsupported method " + method);
             }
+            httpExchange.getResponseBody().close();
         } catch (IOException e) {
             try {
                 httpExchange.sendResponseHeaders(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), -1);
+                httpExchange.getResponseBody().close();
             } catch (IOException sendError) {
                 sendError.printStackTrace();
             }

@@ -2,7 +2,6 @@ package com.bouncestorage.glacierproxy;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -259,8 +258,8 @@ public class Job extends BaseRequestHandler {
         httpExchange.getResponseHeaders().put("Content-Length", ImmutableList.of(Long.toString(size)));
         httpExchange.getResponseHeaders().put("x-amz-sha256-tree-hash", ImmutableList.of("deadbeef"));
         httpExchange.sendResponseHeaders(Response.Status.OK.getStatusCode(), size);
-        try (InputStream from = blob.getPayload().openStream(); OutputStream to = httpExchange.getResponseBody()){
-            ByteStreams.copy(from, to);
+        try (InputStream from = blob.getPayload().openStream()){
+            ByteStreams.copy(from, httpExchange.getResponseBody());
         }
     }
 

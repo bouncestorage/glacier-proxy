@@ -1,7 +1,6 @@
 package com.bouncestorage.glacierproxy;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -131,11 +130,9 @@ public class Multipart extends BaseRequestHandler {
         // parts are 1-indexed
         int partNumber = (int) (start/upload.partSize + 1);
 
-        MultipartPart uploadedPart;
-        try (InputStream in = request.getRequestBody()) {
-            Payload payload = Payloads.newInputStreamPayload(in);
-            uploadedPart = proxy.getBlobStore().uploadMultipartPart(upload.jcloudsUpload, partNumber, payload);
-        }
+        Payload payload = Payloads.newInputStreamPayload(request.getRequestBody());
+        MultipartPart uploadedPart = proxy.getBlobStore().uploadMultipartPart(upload.jcloudsUpload, partNumber,
+                payload);
         if (uploadedPart == null) {
             Util.sendServerError("Failed to save the part", request);
             return;
