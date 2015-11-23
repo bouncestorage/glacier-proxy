@@ -138,7 +138,7 @@ public class Multipart extends BaseRequestHandler {
             return;
         }
         String sha256TreeHash = request.getRequestHeaders().getFirst("x-amz-sha256-tree-hash");
-        upload.parts.add(new UploadPart(uploadedPart, sha256TreeHash, size));
+        upload.parts.add(new UploadPart(sha256TreeHash, size));
 
         request.getResponseHeaders().put("x-amz-sha256-tree-hash",
                 request.getRequestHeaders().get("x-amz-sha256-tree-hash"));
@@ -235,11 +235,10 @@ public class Multipart extends BaseRequestHandler {
         long uploadedSize = 0;
         for(int i = 0; i < upload.parts.size(); i++) {
             UploadPart uploadPart = upload.parts.get(i);
-            MultipartPart part = uploadPart.getPart();
-            uploadedSize += part.partSize();
-            if (i < upload.parts.size()-1 && part.partSize() != upload.partSize) {
+            uploadedSize += uploadPart.getSize();
+            if (i < upload.parts.size()-1 && uploadPart.getSize() != upload.partSize) {
                 Util.sendBadRequest(String.format("Uploaded part is smaller than part size and is not last: %d",
-                        part.partSize()), request);
+                        uploadPart.getSize()), request);
                 return;
             }
         }
@@ -256,7 +255,7 @@ public class Multipart extends BaseRequestHandler {
         }
 
         proxy.completeUpload(vault, uploadID);
-        request.getResponseHeaders().put("x-amz-archive-id", ImmutableList.of(uploadID.toString()));
+        request.getResponseHeaders().put("x-amz-archive-id", ImmutableList.of(upload.jcloudsUpload.blobName()));
         request.getResponseHeaders().put("Location", ImmutableList.of(
                 Util.getArchiveLocation(params.get("account"), vault, uploadIDParam)));
         request.sendResponseHeaders(Response.Status.CREATED.getStatusCode(), -1);
@@ -340,18 +339,12 @@ public class Multipart extends BaseRequestHandler {
     }
 
     public static class UploadPart {
-        MultipartPart part;
         String sha256TreeHash;
         long size;
 
-        UploadPart(MultipartPart part, String sha256TreeHash, long size) {
-            this.part = part;
+        UploadPart(String sha256TreeHash, long size) {
             this.sha256TreeHash = sha256TreeHash;
             this.size = size;
-        }
-
-        MultipartPart getPart() {
-            return part;
         }
 
         String getSha256TreeHash() {
