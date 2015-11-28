@@ -23,6 +23,9 @@ public class Util {
 
     public static Multimap<String, String> parseQuery(String query) {
         Multimap<String, String> map = LinkedHashMultimap.create();
+        if (query == null) {
+            return map;
+        }
         for (String q : query.split("&")) {
             String[] kv = q.split("=");
             map.put(kv[0], kv[1]);

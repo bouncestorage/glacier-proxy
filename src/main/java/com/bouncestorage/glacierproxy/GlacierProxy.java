@@ -70,6 +70,8 @@ public class GlacierProxy {
 
     public UUID addJob(String vault, JSONObject json) {
         UUID uuid = UUID.randomUUID();
+        json.put("CreationDate", Util.getTimeStamp(null));
+        json.put("CompletionDate", Util.getTimeStamp(null));
         if (!jobMap.containsKey(vault)) {
             jobMap.put(vault, new ConcurrentHashMap<>());
         }
