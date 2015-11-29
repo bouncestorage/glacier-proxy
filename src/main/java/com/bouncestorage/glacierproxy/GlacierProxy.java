@@ -9,10 +9,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.jclouds.ContextBuilder;
 import org.jclouds.blobstore.BlobStore;
 import org.jclouds.blobstore.BlobStoreContext;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.gson.JsonObject;
 import com.sun.net.httpserver.HttpServer;
 
 public class GlacierProxy {
@@ -20,7 +20,7 @@ public class GlacierProxy {
 
     private HttpServer server;
     private BlobStore blobStore;
-    private Map<String, Map<UUID, JSONObject>> jobMap;
+    private Map<String, Map<UUID, JsonObject>> jobMap;
     private Map<String, Map<UUID, Multipart.Upload>> partsMap;
 
     public void start() throws IOException {
@@ -56,20 +56,22 @@ public class GlacierProxy {
         return new Multipart(this);
     }
 
-    public JSONObject getJob(String vault, UUID jobId) {
-        Map<UUID, JSONObject> map = jobMap.get(vault);
+    public JsonObject getJob(String vault, UUID jobId) {
+        Map<UUID, JsonObject> map = jobMap.get(vault);
         if (map == null) {
             return null;
         }
         return map.get(jobId);
     }
 
-    public Map<UUID, JSONObject> getVaultJobs(String vault) {
+    public Map<UUID, JsonObject> getVaultJobs(String vault) {
         return jobMap.get(vault);
     }
 
-    public UUID addJob(String vault, JSONObject json) {
+    public UUID addJob(String vault, JsonObject json) {
         UUID uuid = UUID.randomUUID();
+        json.addProperty("CreationDate", Util.getTimeStamp(null));
+        json.addProperty("CompletionDate", Util.getTimeStamp(null));
         if (!jobMap.containsKey(vault)) {
             jobMap.put(vault, new ConcurrentHashMap<>());
         }

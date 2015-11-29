@@ -7,12 +7,12 @@ import javax.ws.rs.core.Response;
 
 import org.jclouds.blobstore.domain.PageSet;
 import org.jclouds.blobstore.domain.StorageMetadata;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableList;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import com.sun.net.httpserver.HttpExchange;
 
 public class Vault extends BaseRequestHandler {
@@ -31,25 +31,25 @@ public class Vault extends BaseRequestHandler {
 
         // TODO: Support pagination (markers) for vault listing
         PageSet<? extends StorageMetadata> results = proxy.getBlobStore().list();
-        JSONObject response = new JSONObject();
+        JsonObject response = new JsonObject();
         if (results.getNextMarker() == null) {
-            response.put("Marker", JSONObject.NULL);
+            response.add("Marker", null);
         } else {
-            response.put("Marker", results.getNextMarker());
+            response.addProperty("Marker", results.getNextMarker());
         }
-        JSONArray values = new JSONArray();
+        JsonArray values = new JsonArray();
         for (StorageMetadata value : results) {
-            JSONObject entry = new JSONObject();
-            entry.put("CreationDate", Util.getTimeStamp(value.getCreationDate()));
-            entry.put("LastInventoryDate", Util.getTimeStamp(value.getCreationDate()));
-            entry.put("SizeInBytes", -1);
-            entry.put("NumberOfArchives", 0);
-            entry.put("VaultName", value.getName());
-            entry.put("VaultARN", Util.getARN(parameters.get("account"), value.getName()));
-            values.put(entry);
+            JsonObject entry = new JsonObject();
+            entry.addProperty("CreationDate", Util.getTimeStamp(value.getCreationDate()));
+            entry.addProperty("LastInventoryDate", Util.getTimeStamp(value.getCreationDate()));
+            entry.addProperty("SizeInBytes", -1);
+            entry.addProperty("NumberOfArchives", 0);
+            entry.addProperty("VaultName", value.getName());
+            entry.addProperty("VaultARN", Util.getARN(parameters.get("account"), value.getName()));
+            values.add(entry);
         }
-        response.put("VaultList", values);
-        logger.debug("List vaults: {}", response.toString(4));
+        response.add("VaultList", values);
+        logger.debug("List vaults: {}", response.toString());
         Util.sendJSON(httpExchange, Response.Status.OK, response);
     }
 
@@ -96,17 +96,17 @@ public class Vault extends BaseRequestHandler {
             return;
         }
         logger.debug("Describe vault request for {}", vaultName);
-        JSONObject vault = new JSONObject();
+        JsonObject vault = new JsonObject();
         for (StorageMetadata container : proxy.getBlobStore().list()) {
             if (!container.getName().equals(vaultName)) {
                 continue;
             }
-            vault.put("CreationDate", Util.getTimeStamp(container.getCreationDate()));
-            vault.put("LastInventoryDate", Util.getTimeStamp(container.getCreationDate()));
+            vault.addProperty("CreationDate", Util.getTimeStamp(container.getCreationDate()));
+            vault.addProperty("LastInventoryDate", Util.getTimeStamp(container.getCreationDate()));
         }
-        vault.put("SizeInBytes", -1);
-        vault.put("VaultARN", Util.getARN(parameters.get("account"), parameters.get("vault")));
-        vault.put("VaultName", parameters.get("vault"));
+        vault.addProperty("SizeInBytes", -1);
+        vault.addProperty("VaultARN", Util.getARN(parameters.get("account"), parameters.get("vault")));
+        vault.addProperty("VaultName", parameters.get("vault"));
         Util.sendJSON(httpExchange, Response.Status.OK, vault);
     }
 }
