@@ -2,7 +2,7 @@ package com.bouncestorage.glacierproxy;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Date;
+import java.io.InputStreamReader;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -11,15 +11,15 @@ import javax.ws.rs.core.Response;
 
 import org.jclouds.blobstore.domain.Blob;
 import org.jclouds.blobstore.domain.BlobMetadata;
-import org.json.JSONArray;
-import org.json.JSONObject;
-import org.json.JSONTokener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Multimap;
 import com.google.common.io.ByteStreams;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.sun.net.httpserver.HttpExchange;
 
 public class Job extends BaseRequestHandler {
@@ -32,10 +32,11 @@ public class Job extends BaseRequestHandler {
 
     @Override
     public void handlePost(HttpExchange request, Map<String, String> parameters) throws IOException {
-        JSONObject object = new JSONObject(new JSONTokener(request.getRequestBody()));
-        String jobType = object.optString("Type");
+        JsonParser jsonParser = new JsonParser();
+        JsonObject object = jsonParser.parse(new InputStreamReader(request.getRequestBody())).getAsJsonObject();
+        String jobType = object.get("Type").getAsString();
         if (jobType == null || !JOB_TYPES.contains(jobType)) {
-            logger.warn("Invalid job type {}", object.getString("Type"));
+            logger.warn("Invalid job type {}", object.get("Type"));
             Util.sendBadRequest(String.format("Invalid job type %s", jobType), request);
             return;
         }
@@ -47,7 +48,7 @@ public class Job extends BaseRequestHandler {
         }
 
         if (jobType.equals("archive-retrieval")) {
-            String blobName = object.getString("ArchiveId");
+            String blobName = object.get("ArchiveId").getAsString();
             if (blobName == null) {
                 Util.sendBadRequest("Missing archive ID", request);
                 return;
@@ -74,7 +75,7 @@ public class Job extends BaseRequestHandler {
         if (parameters.get("job") != null) {
             String vault = parameters.get("vault");
             String jobId = parameters.get("job");
-            JSONObject jobRequest = proxy.getJob(vault, UUID.fromString(jobId));
+            JsonObject jobRequest = proxy.getJob(vault, UUID.fromString(jobId));
             if (jobRequest == null) {
                 logger.debug("Job {} does not exist", jobId);
                 Util.sendNotFound("job", jobId, request);
@@ -99,12 +100,12 @@ public class Job extends BaseRequestHandler {
         }
     }
 
-    private void handleDescribeJob(HttpExchange httpExchange, Map<String, String> parameters, JSONObject jobRequest)
+    private void handleDescribeJob(HttpExchange httpExchange, Map<String, String> parameters, JsonObject jobRequest)
             throws IOException {
-        JSONObject response = null;
-        if (jobRequest.get("Type").equals("archive-retrieval")) {
+        JsonObject response;
+        if (jobRequest.get("Type").getAsString().equals("archive-retrieval")) {
             response = handleDescribeRetrieveArchive(parameters, jobRequest);
-        } else if (jobRequest.get("Type").equals("inventory-retrieval")) {
+        } else if (jobRequest.get("Type").getAsString().equals("inventory-retrieval")) {
             response = handleDescribeRetrieveInventory(parameters, jobRequest);
         } else {
             logger.warn("Invalid request {}", httpExchange.getRequestURI().getPath());
@@ -113,44 +114,45 @@ public class Job extends BaseRequestHandler {
         }
         logger.debug("Describe job {}", parameters.get("job"));
         String vault = parameters.get("vault");
-        response.put("Action", jobRequest.get("Type"));
-        response.put("Completed", true);
-        response.put("CompletionDate", Util.getTimeStamp(null));
-        response.put("CreationDate", Util.getTimeStamp(null));
-        response.put("JobDescription", jobRequest.opt("JobDescription"));
-        response.put("JobId", parameters.get("job"));
-        response.put("SNSTopic", JSONObject.NULL);
-        response.put("StatusCode", "Succeeded");
-        response.put("StatusMessage", "Succeeded");
-        response.put("VaultARN", Util.getARN(parameters.get("account"), vault));
+        response.add("Action", jobRequest.get("Type"));
+        response.addProperty("Completed", true);
+        response.add("CompletionDate", jobRequest.get("CreationDate"));
+        response.add("CreationDate", jobRequest.get("CompletionDate"));
+        response.add("JobDescription", jobRequest.get("JobDescription"));
+        response.addProperty("JobId", parameters.get("job"));
+        response.add("SNSTopic", null);
+        response.addProperty("StatusCode", "Succeeded");
+        response.addProperty("StatusMessage", "Succeeded");
+        response.addProperty("VaultARN", Util.getARN(parameters.get("account"), vault));
+        logger.debug("GET job: {}", response.toString());
         Util.sendJSON(httpExchange, Response.Status.OK, response);
     }
 
-    private JSONObject handleDescribeRetrieveArchive(Map<String, String> parameters, JSONObject jobRequest) {
-        JSONObject response = new JSONObject();
-        String blobName = (String) jobRequest.get("ArchiveId");
+    private JsonObject handleDescribeRetrieveArchive(Map<String, String> parameters, JsonObject jobRequest) {
+        JsonObject response = new JsonObject();
+        String blobName = jobRequest.get("ArchiveId").getAsString();
         BlobMetadata metadata = proxy.getBlobStore().blobMetadata(parameters.get("vault"), blobName);
-        response.put("ArchiveId", jobRequest.get("ArchiveId"));
-        response.put("ArchiveSize", metadata.getSize());
-        response.put("ArchiveSHA256TreeHash", "deadbeef");
-        response.put("InventorySizeInBytes", JSONObject.NULL);
-        response.put("RetrievalByteRange", metadata.getSize()-1);
-        response.put("SHA256TreeHash", JSONObject.NULL);
+        response.add("ArchiveId", jobRequest.get("ArchiveId"));
+        response.addProperty("ArchiveSize", metadata.getSize());
+        response.addProperty("ArchiveSHA256TreeHash", "deadbeef");
+        response.add("InventorySizeInBytes", null);
+        response.addProperty("RetrievalByteRange", String.format("0-%d", metadata.getSize() - 1));
+        response.add("SHA256TreeHash", null);
         return response;
     }
 
-    private JSONObject handleDescribeRetrieveInventory(Map<String, String> parameters, JSONObject jobRequest) {
-        JSONObject response = new JSONObject();
-        response.put("ArchiveId", JSONObject.NULL);
-        response.put("ArchiveSize", JSONObject.NULL);
-        response.put("ArchiveSHA256TreeHash", JSONObject.NULL);
-        response.put("InventorySizeInBytes", -1);
-        response.put("RetrievalByteRange", JSONObject.NULL);
-        response.put("SHA256TreeHash", JSONObject.NULL);
-        JSONObject inventoryParams = jobRequest.optJSONObject("InventoryRetrievalParameters");
+    private JsonObject handleDescribeRetrieveInventory(Map<String, String> parameters, JsonObject jobRequest) {
+        JsonObject response = new JsonObject();
+        response.add("ArchiveId", null);
+        response.add("ArchiveSize", null);
+        response.add("ArchiveSHA256TreeHash", null);
+        response.addProperty("InventorySizeInBytes", -1);
+        response.add("RetrievalByteRange", null);
+        response.add("SHA256TreeHash", null);
+        JsonObject inventoryParams = jobRequest.getAsJsonObject("InventoryRetrievalParameters");
         if (inventoryParams != null) {
-            inventoryParams.put("Format", jobRequest.opt("Format"));
-            response.put("InventoryRetrievalParameters", inventoryParams);
+            inventoryParams.addProperty("Format", "JSON");
+            response.add("InventoryRetrievalParameters", inventoryParams);
         }
         return response;
     }
@@ -166,14 +168,14 @@ public class Job extends BaseRequestHandler {
             return;
         }
         String vault = parameters.get("vault");
-        JSONObject response = new JSONObject();
+        JsonObject response = new JsonObject();
         // TODO: handle markers and > 1000 jobs
-        response.put("Marker", JSONObject.NULL);
-        JSONArray jsonJobs = new JSONArray();
+        response.add("Marker", null);
+        JsonArray jsonJobs = new JsonArray();
         if (listJobsOptions.getCompleted() != null && !listJobsOptions.getCompleted()) {
             // All jobs are treated as immediately completed
             logger.debug("List jobs for {}: []", vault);
-            response.put("JobList", jsonJobs);
+            response.add("JobList", jsonJobs);
             Util.sendJSON(httpExchange, Response.Status.OK, response);
             return;
         }
@@ -181,73 +183,72 @@ public class Job extends BaseRequestHandler {
         if (listJobsOptions.getStatusCode() != null && !listJobsOptions.getStatusCode().equals("Succeeded")) {
             // All jobs are treated as immediately completed
             logger.debug("List jobs for {}: []", vault);
-            response.put("JobList", jsonJobs);
+            response.add("JobList", jsonJobs);
             Util.sendJSON(httpExchange, Response.Status.OK, response);
             return;
         }
 
-        Map<UUID, JSONObject> jobs = proxy.getVaultJobs(vault);
+        Map<UUID, JsonObject> jobs = proxy.getVaultJobs(vault);
         jobs.forEach((uuid, json) -> {
-            JSONObject jobObject = new JSONObject();
-            jobObject.put("Completed", true);
-            jobObject.put("CompletionDate", Util.getTimeStamp(null));
-            jobObject.put("StatusCode", "Succeeded");
-            jobObject.put("StatusMessage", "Succeeded");
-            jobObject.put("VaultARN", Util.getARN(parameters.get("account"), vault));
-            jobObject.put("JobId", uuid.toString());
-            jobObject.put("JobDescription", json.get("JobDescription"));
-            jobObject.put("SNSTopic", json.get("SNSTopic"));
-            jobObject.put("SHA256TreeHash", JSONObject.NULL);
+            JsonObject jobObject = new JsonObject();
+            jobObject.addProperty("Completed", true);
+            jobObject.add("CreationDate", json.get("CreationDate"));
+            jobObject.add("CompletionDate", json.get("CompletionDate"));
+            jobObject.addProperty("StatusCode", "Succeeded");
+            jobObject.addProperty("StatusMessage", "Succeeded");
+            jobObject.addProperty("VaultARN", Util.getARN(parameters.get("account"), vault));
+            jobObject.addProperty("JobId", uuid.toString());
+            jobObject.add("JobDescription", json.get("JobDescription"));
+            jobObject.add("SNSTopic", json.get("SNSTopic"));
             if (json.get("Type").equals("archive-retrieval")) {
-                jobObject.put("Action", "ArchiveRetrieval");
-                jobObject.put("ArchiveId", json.get("ArchiveId"));
-                // TODO: populate the size
-                jobObject.put("ArchiveSizeInBytes", -1);
-                jobObject.put("ArchiveSHA256TreeHash", "deadbeef");
-                jobObject.put("RetrievalByteRange", -1);
+                jobObject.addProperty("Action", "ArchiveRetrieval");
+                jobObject.add("ArchiveId", json.get("ArchiveId"));
+                BlobMetadata meta = proxy.getBlobStore().blobMetadata(vault, json.get("ArchiveId").getAsString());
+                jobObject.addProperty("ArchiveSizeInBytes", meta.getSize());
+                jobObject.addProperty("RetrievalByteRange", String.format("0-%d", meta.getSize()));
             } else {
-                jobObject.put("Action", "InventoryRetriveal");
-                jobObject.put("ArchiveSHA256TreeHash", JSONObject.NULL);
-                jobObject.put("InventorySizeInBytes", -1);
-                JSONObject inventoryParams = json.optJSONObject("InventoryRetrievalParameters");
+                jobObject.add("SHA256TreeHash", null);
+                jobObject.addProperty("Action", "InventoryRetriveal");
+                jobObject.add("ArchiveSHA256TreeHash", null);
+                jobObject.addProperty("InventorySizeInBytes", -1);
+                jobObject.add("RetrievalByteRange", null);
+                JsonObject inventoryParams = json.getAsJsonObject("InventoryRetrievalParameters");
                 if (inventoryParams != null) {
-                    inventoryParams.put("Format", "JSON");
-                    jobObject.put("InventoryRetrievalParameters", inventoryParams);
+                    inventoryParams.addProperty("Format", "JSON");
+                    jobObject.add("InventoryRetrievalParameters", inventoryParams);
                 }
-                jobObject.put("RetrievalByteRange", JSONObject.NULL);
             }
+            jsonJobs.add(jobObject);
         });
-        response.put("JobList", jsonJobs);
-        logger.debug("List jobs for {}: {}", vault, response.toString(4));
+        response.add("JobList", jsonJobs);
+        logger.debug("List jobs for {}: {}", vault, response.toString());
         Util.sendJSON(httpExchange, Response.Status.OK, response);
     }
 
-    private void handleRetrieveInventoryJob(HttpExchange httpExchange, Map<String, String> parameters, JSONObject job)
+    private void handleRetrieveInventoryJob(HttpExchange httpExchange, Map<String, String> parameters, JsonObject job)
             throws IOException {
         String vault = parameters.get("vault");
-        JSONObject response = new JSONObject();
-        response.put("VaultARN", Util.getARN(parameters.get("account"), vault));
-        response.put("InventoryDate", new Date());
-        JSONArray archives = new JSONArray();
+        JsonObject response = new JsonObject();
+        response.addProperty("VaultARN", Util.getARN(parameters.get("account"), vault));
+        response.addProperty("InventoryDate", Util.getTimeStamp(null));
+        JsonArray archives = new JsonArray();
 
         // TODO: support pagination
         proxy.getBlobStore().list(vault).forEach(sm -> {
-            JSONObject archive = new JSONObject();
-            archive.put("ArchiveId", sm.getName());
-            archive.put("CreationDate", sm.getCreationDate());
-            archive.put("Size", sm.getSize());
-            archive.put("SHA256TreeHash", "deadbeef");
-            archive.put("ArchiveDescription", "NA");
-            archives.put(archive);
+            JsonObject archive = new JsonObject();
+            archive.addProperty("ArchiveId", sm.getName());
+            archive.addProperty("CreationDate", Util.getTimeStamp(sm.getLastModified()));
+            archive.addProperty("Size", sm.getSize());
+            archives.add(archive);
         });
-        response.put("ArchiveList", archives);
+        response.add("ArchiveList", archives);
 
         logger.debug("Job {}: Retrieve archive list for {}", parameters.get("job"), vault);
         Util.sendJSON(httpExchange, Response.Status.OK, response);
     }
 
-    private void handleRetrieveArchiveJob(HttpExchange httpExchange, String vault, JSONObject job) throws IOException{
-        String blobName = job.getString("ArchiveId");
+    private void handleRetrieveArchiveJob(HttpExchange httpExchange, String vault, JsonObject job) throws IOException{
+        String blobName = job.get("ArchiveId").getAsString();
         Blob blob = proxy.getBlobStore().getBlob(vault, blobName);
         if (blob == null) {
             Util.sendNotFound("archive", blobName, httpExchange);

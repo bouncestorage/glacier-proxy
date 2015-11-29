@@ -10,12 +10,13 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import org.jclouds.blobstore.options.ListContainerOptions;
-import org.json.JSONObject;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Multimap;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.sun.net.httpserver.HttpExchange;
 
 public class Util {
@@ -60,7 +61,7 @@ public class Util {
         return format.format(date);
     }
 
-    public static void sendJSON(HttpExchange httpExchange, Response.Status code, JSONObject json) throws IOException {
+    public static void sendJSON(HttpExchange httpExchange, Response.Status code, JsonObject json) throws IOException {
         String jsonResponse = json.toString();
         httpExchange.getResponseHeaders().put("Content-type", ImmutableList.of(MediaType.APPLICATION_JSON));
         httpExchange.sendResponseHeaders(code.getStatusCode(), jsonResponse.length());
@@ -68,27 +69,27 @@ public class Util {
     }
 
     public static void sendBadRequest(String message, HttpExchange httpExchange) throws IOException {
-        JSONObject response = new JSONObject();
-        response.put("code", "BadRequest");
-        response.put("message", message);
-        response.put("type", "client");
+        JsonObject response = new JsonObject();
+        response.addProperty("code", "BadRequest");
+        response.addProperty("message", message);
+        response.addProperty("type", "client");
         sendJSON(httpExchange, Response.Status.BAD_REQUEST, response);
     }
 
     public static void sendServerError(String message, HttpExchange httpExchange) throws IOException {
-        JSONObject response = new JSONObject();
-        response.put("code", "ServiceUnavailableException");
-        response.put("message", message);
-        response.put("type", "server");
+        JsonObject response = new JsonObject();
+        response.addProperty("code", "ServiceUnavailableException");
+        response.addProperty("message", message);
+        response.addProperty("type", "server");
         sendJSON(httpExchange, Response.Status.SERVICE_UNAVAILABLE, response);
     }
 
     public static void sendNotFound(String resourceType, String resourceId, HttpExchange httpExchange) throws
             IOException {
-        JSONObject response = new JSONObject();
-        response.put("code", "ResourceNotFoundException");
-        response.put("message", String.format("The %s was not found: %s", resourceType, resourceId));
-        response.put("type", "client");
+        JsonObject response = new JsonObject();
+        response.addProperty("code", "ResourceNotFoundException");
+        response.addProperty("message", String.format("The %s was not found: %s", resourceType, resourceId));
+        response.addProperty("type", "client");
         sendJSON(httpExchange, Response.Status.NOT_FOUND, response);
     }
 

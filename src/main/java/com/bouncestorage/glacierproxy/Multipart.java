@@ -15,12 +15,12 @@ import org.jclouds.blobstore.domain.MultipartPart;
 import org.jclouds.blobstore.domain.MultipartUpload;
 import org.jclouds.io.Payload;
 import org.jclouds.io.Payloads;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableList;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import com.sun.net.httpserver.HttpExchange;
 
 public class Multipart extends BaseRequestHandler {
@@ -153,19 +153,19 @@ public class Multipart extends BaseRequestHandler {
         }
 
         // TODO: implement pagination
-        JSONObject response = new JSONObject();
-        response.put("Marker", JSONObject.NULL);
-        JSONArray uploadList = new JSONArray();
+        JsonObject response = new JsonObject();
+        response.add("Marker", null);
+        JsonArray uploadList = new JsonArray();
         Map<UUID, Upload> uploadMap = proxy.getUploads(vault);
         if (uploadMap != null) {
             uploadMap.entrySet().forEach(entry -> {
-                JSONObject uploadJSON = entry.getValue().toJSON();
-                uploadJSON.put("MultipartUploadId", entry.getKey().toString());
-                uploadJSON.put("VaultARN", Util.getARN(params.get("account"), vault));
-                uploadList.put(uploadJSON);
+                JsonObject uploadJSON = entry.getValue().toJSON();
+                uploadJSON.addProperty("MultipartUploadId", entry.getKey().toString());
+                uploadJSON.addProperty("VaultARN", Util.getARN(params.get("account"), vault));
+                uploadList.add(uploadJSON);
             });
         }
-        response.put("UploadsList", uploadList);
+        response.add("UploadsList", uploadList);
         Util.sendJSON(request, Response.Status.OK, response);
     }
 
@@ -184,23 +184,23 @@ public class Multipart extends BaseRequestHandler {
         if (upload == null) {
             Util.sendNotFound("multipart upload", uploadIDParam, request);
         }
-        JSONObject response = new JSONObject();
-        response.put("ArchiveDescription", upload.description);
-        response.put("CreationDate", Util.getTimeStamp(upload.jcloudsUpload.blobMetadata().getCreationDate()));
-        response.put("Marker", JSONObject.NULL);
-        response.put("MultipartUploadId", uploadIDParam);
-        response.put("PartSizeInBytes", upload.partSize);
-        JSONArray parts = new JSONArray();
+        JsonObject response = new JsonObject();
+        response.addProperty("ArchiveDescription", upload.description);
+        response.addProperty("CreationDate", Util.getTimeStamp(upload.jcloudsUpload.blobMetadata().getCreationDate()));
+        response.add("Marker", null);
+        response.addProperty("MultipartUploadId", uploadIDParam);
+        response.addProperty("PartSizeInBytes", upload.partSize);
+        JsonArray parts = new JsonArray();
         long rangeStart = 0;
         for (UploadPart part : upload.parts) {
-            JSONObject jsonPart = new JSONObject();
-            jsonPart.put("SHA256TreeHash", part.getSha256TreeHash());
-            jsonPart.put("RangeInBytes", String.format("%d-%d", rangeStart, rangeStart + part.getSize()-1));
+            JsonObject jsonPart = new JsonObject();
+            jsonPart.addProperty("SHA256TreeHash", part.getSha256TreeHash());
+            jsonPart.addProperty("RangeInBytes", String.format("%d-%d", rangeStart, rangeStart + part.getSize()-1));
             rangeStart += part.getSize();
-            parts.put(jsonPart);
+            parts.add(jsonPart);
         }
-        response.put("Parts", parts);
-        response.put("VaultARN", Util.getARN(params.get("account"), vault));
+        response.add("Parts", parts);
+        response.addProperty("VaultARN", Util.getARN(params.get("account"), vault));
         Util.sendJSON(request, Response.Status.OK, response);
     }
 
@@ -325,15 +325,15 @@ public class Multipart extends BaseRequestHandler {
             parts = new ArrayList<>();
         }
 
-        JSONObject toJSON() {
-            JSONObject response = new JSONObject();
-            response.put("CreationDate", Util.getTimeStamp(jcloudsUpload.blobMetadata().getCreationDate()));
+        JsonObject toJSON() {
+            JsonObject response = new JsonObject();
+            response.addProperty("CreationDate", Util.getTimeStamp(jcloudsUpload.blobMetadata().getCreationDate()));
             if (description == null) {
-                response.put("ArchiveDescription", JSONObject.NULL);
+                response.add("ArchiveDescription", null);
             } else {
-                response.put("ArchiveDescription", description);
+                response.addProperty("ArchiveDescription", description);
             }
-            response.put("PartSizeInBytes", partSize);
+            response.addProperty("PartSizeInBytes", partSize);
             return response;
         }
     }
