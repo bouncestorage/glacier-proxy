@@ -29,4 +29,3 @@ Make sure to initialize the submodules (```git submodule init```) and keep them 
 - add support for additional configuration options (such as port, provider, credentials)
 - authenticate requests
 - validate tree- and SHA256 hashes in requests
-- implement multi-part archive upload
