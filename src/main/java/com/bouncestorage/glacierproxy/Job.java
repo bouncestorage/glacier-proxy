@@ -82,7 +82,7 @@ public class Job extends BaseRequestHandler {
                 return;
             }
             if (path.endsWith("output")) {
-                if (jobRequest.get("Type").equals("archive-retrieval")) {
+                if (jobRequest.get("Type").getAsString().equals("archive-retrieval")) {
                     handleRetrieveArchiveJob(request, vault, jobRequest);
                     return;
                 } else {
@@ -201,10 +201,14 @@ public class Job extends BaseRequestHandler {
             jobObject.add("JobDescription", json.get("JobDescription"));
             jobObject.add("SNSTopic", json.get("SNSTopic"));
             if (json.get("Type").equals("archive-retrieval")) {
+                JsonObject archiveMetadata = Util.getMetadata(proxy.getBlobStore(), vault,
+                        json.get("ArchiveId").getAsString());
                 jobObject.addProperty("Action", "ArchiveRetrieval");
                 jobObject.add("ArchiveId", json.get("ArchiveId"));
                 BlobMetadata meta = proxy.getBlobStore().blobMetadata(vault, json.get("ArchiveId").getAsString());
                 jobObject.addProperty("ArchiveSizeInBytes", meta.getSize());
+                jobObject.add("ArchiveSHA256TreeHash", archiveMetadata.get(Archive.METADATA_TREE_HASH));
+                jobObject.add("SHA256TreeHash", archiveMetadata.get(Archive.METADATA_TREE_HASH));
                 jobObject.addProperty("RetrievalByteRange", String.format("0-%d", meta.getSize()));
             } else {
                 jobObject.add("SHA256TreeHash", null);
@@ -234,16 +238,25 @@ public class Job extends BaseRequestHandler {
         JsonArray archives = new JsonArray();
 
         // TODO: support pagination
+        // TODO: we should do this asynchronously and create a blob with the results that we can serve back
         proxy.getBlobStore().list(vault).forEach(sm -> {
+            if (Util.isMetadataBlob(sm.getName())) {
+                return;
+            }
             JsonObject archive = new JsonObject();
             archive.addProperty("ArchiveId", sm.getName());
             archive.addProperty("CreationDate", Util.getTimeStamp(sm.getLastModified()));
             archive.addProperty("Size", sm.getSize());
+            JsonObject metadata = Util.getMetadata(proxy.getBlobStore(), vault, sm.getName());
+            if (metadata.has(Archive.METADATA_DESCRIPTION)) {
+                archive.add("ArchiveDescription", metadata.get(Archive.METADATA_DESCRIPTION));
+            }
+            archive.add("SHA256TreeHash", metadata.get(Archive.METADATA_TREE_HASH));
             archives.add(archive);
         });
         response.add("ArchiveList", archives);
 
-        logger.debug("Job {}: Retrieve archive list for {}", parameters.get("job"), vault);
+        logger.debug("Job {}: Retrieve archive list for {}: {}", parameters.get("job"), vault, response.toString());
         Util.sendJSON(httpExchange, Response.Status.OK, response);
     }
 
@@ -254,10 +267,12 @@ public class Job extends BaseRequestHandler {
             Util.sendNotFound("archive", blobName, httpExchange);
             return;
         }
+        JsonObject metadata = Util.getMetadata(proxy.getBlobStore(), vault, blobName);
         logger.debug("Job {}: Retrieve archive {}/{}", job.get("JobId"), vault, blobName);
         long size = blob.getMetadata().getSize();
         httpExchange.getResponseHeaders().put("Content-Length", ImmutableList.of(Long.toString(size)));
-        httpExchange.getResponseHeaders().put("x-amz-sha256-tree-hash", ImmutableList.of("deadbeef"));
+        httpExchange.getResponseHeaders().put("x-amz-sha256-tree-hash",
+                ImmutableList.of(metadata.get(Archive.METADATA_TREE_HASH).getAsString()));
         httpExchange.sendResponseHeaders(Response.Status.OK.getStatusCode(), size);
         try (InputStream from = blob.getPayload().openStream()){
             ByteStreams.copy(from, httpExchange.getResponseBody());

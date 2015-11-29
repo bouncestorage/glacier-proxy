@@ -1,26 +1,44 @@
 package com.bouncestorage.glacierproxy;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Map;
 import java.util.TimeZone;
 
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.jclouds.blobstore.BlobStore;
+import org.jclouds.blobstore.ContainerNotFoundException;
+import org.jclouds.blobstore.domain.Blob;
 import org.jclouds.blobstore.options.ListContainerOptions;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.io.ByteSource;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.sun.net.httpserver.HttpExchange;
 
 public class Util {
-    public static final String DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ssZ";
+    private static final String DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ssZ";
+    private static final String METADATA_SUFFIX = "_metadata";
+
+    public static String putMetadataBlob(Map<String, String> metadata, BlobStore blobStore, String vault,
+                                         String archiveName) {
+        Gson gson = new Gson();
+        String jsonString = gson.toJson(metadata);
+        Blob metadataBlob = blobStore.blobBuilder(getMetadataBlobName(archiveName))
+                .payload(ByteSource.wrap(jsonString.getBytes())).build();
+        return blobStore.putBlob(vault, metadataBlob);
+    }
 
     public static Multimap<String, String> parseQuery(String query) {
         Multimap<String, String> map = LinkedHashMultimap.create();
@@ -103,5 +121,31 @@ public class Util {
 
     public static String getArchiveLocation(String accountId, String vault, String archive) {
         return String.format("%s/vaults/%s/archives/%s", accountId, vault, archive);
+    }
+
+    public static String getMetadataBlobName(String archiveName) {
+        return archiveName + METADATA_SUFFIX;
+    }
+
+    public static boolean isMetadataBlob(String blobName) {
+        return blobName.endsWith(METADATA_SUFFIX);
+    }
+
+    public static JsonObject getMetadata(BlobStore blobStore, String vault, String name) {
+        Blob blob;
+        try {
+            blob = blobStore.getBlob(vault, Util.getMetadataBlobName(name));
+        } catch (ContainerNotFoundException cnfe) {
+            return new JsonObject();
+        }
+        if (blob == null) {
+            return new JsonObject();
+        }
+        try (InputStream out = blob.getPayload().openStream()) {
+            JsonParser parser = new JsonParser();
+            return parser.parse(new InputStreamReader(out)).getAsJsonObject();
+        } catch (IOException io) {
+            return new JsonObject();
+        }
     }
 }

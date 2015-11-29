@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.sun.net.httpserver.HttpExchange;
@@ -254,6 +255,20 @@ public class Multipart extends BaseRequestHandler {
             return;
         }
 
+        Map<String, String> metadata;
+        if (upload.description != null) {
+            metadata = ImmutableMap.of(Archive.METADATA_DESCRIPTION, upload.description,
+                    Archive.METADATA_TREE_HASH, request.getRequestHeaders().getFirst("x-amz-sha256-tree-hash"));
+        } else {
+            metadata = ImmutableMap.of(
+                    Archive.METADATA_TREE_HASH, request.getRequestHeaders().getFirst("x-amz-sha256-tree-hash"));
+        }
+        String metadataEtag = Util.putMetadataBlob(metadata, proxy.getBlobStore(), vault,
+                upload.jcloudsUpload.blobName());
+        if (metadataEtag == null) {
+            Util.sendServerError("Failed to complete the multipart upload", request);
+            return;
+        }
         proxy.completeUpload(vault, uploadID);
         request.getResponseHeaders().put("x-amz-archive-id", ImmutableList.of(upload.jcloudsUpload.blobName()));
         request.getResponseHeaders().put("Location", ImmutableList.of(
