@@ -13,6 +13,7 @@ import javax.ws.rs.core.Response;
 import org.jclouds.blobstore.domain.Blob;
 import org.jclouds.blobstore.domain.MultipartPart;
 import org.jclouds.blobstore.domain.MultipartUpload;
+import org.jclouds.blobstore.options.PutOptions;
 import org.jclouds.io.Payload;
 import org.jclouds.io.Payloads;
 import org.slf4j.Logger;
@@ -297,7 +298,7 @@ public class Multipart extends BaseRequestHandler {
         }
         UUID archiveId = UUID.randomUUID();
         Blob mpuBlob = proxy.getBlobStore().blobBuilder(archiveId.toString()).build();
-        MultipartUpload mpu = proxy.getBlobStore().initiateMultipartUpload(vault, mpuBlob.getMetadata());
+        MultipartUpload mpu = proxy.getBlobStore().initiateMultipartUpload(vault, mpuBlob.getMetadata(), new PutOptions());
         if (mpu == null) {
             Util.sendServerError("Failed to create an upload", request);
             return;
