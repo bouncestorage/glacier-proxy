@@ -16,7 +16,7 @@ After this, the jar should be available at ```./target/glacier-proxy-1.0-SNAPSHO
 The proxy can be launched with ```java -jar ./target/glacier-proxy-1.0-SNAPSHOT-jar-with-dependencies.jar```.
 
 #### Tests
-Running the [glacier tests](https://github.com/bouncestorage/glacier-tests}):
+Running the [glacier tests](https://github.com/bouncestorage/glacier-tests):
 ```
 ./src/test/resources/run-glacier-tests.sh
 ```
